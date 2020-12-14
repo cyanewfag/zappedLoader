@@ -1,12 +1,14 @@
 local scrSize = engine.screen_size();
 local keyTable = { {0xBF, "/"}, {0x20, " "}, {0x30, "0"}, {0x31, "1"}, {0x32, "2"}, {0x33, "3"}, {0x34, "4"}, {0x35, "5"}, {0x36, "6"}, {0x37, "7"}, {0x38, "8"}, {0x39, "9"}, {0x41, "A"}, {0x42, "B"}, {0x43, "C"}, {0x44, "D"}, {0x45, "E"}, {0x46, "F"}, {0x47, "G"}, {0x48, "H"}, {0x49, "I"}, {0x4A, "J"}, {0x4B, "K"}, {0x4C, "L"}, {0x4D, "M"}, {0x4E, "N"}, {0x4F, "O"}, {0x50, "P"}, {0x51, "Q"}, {0x52, "R"}, {0x53, "S"}, {0x54, "T"}, {0x55, "U"}, {0x56, "V"}, {0x57, "W"}, {0x58, "X"}, {0x59, "Y"}, {0x5A, "Z"} };
 local mouseVars = { false, 0, 0, false, 0, 0, "", false, 0, 0 };
-local forms = {{"Login Form", 300, 250, (scrSize.x / 2) - 150, (scrSize.y / 2) - 200, {}}};
+local forms = {{"Login Form", 300, 250, (scrSize.x / 2) - 150, (scrSize.y / 2) - 200, {}}, {"LUA Table", 750, 350, (scrSize.x / 2) - 375, (scrSize.y / 2) - 175, {}}};
 local colors = {color.new(38, 38, 38), color.new(48, 48, 48), color.new(189, 137, 255), color.new(58, 58, 58), color.new(68, 68, 68)};
 local fonts = { renderer.create_font("Arial", 12, true) };
 local defaults = { color.new(255, 255, 255), renderer.create_font("Arial", 12, true) }
 local selectedIndex = 0;
 local selectedForm = "";
+local login = { false, "", "" };
+local luaTable = { 0, false, "" };
 
 -- Misc Functions
 function round(x, n) -- Credits toma91
@@ -14,6 +16,17 @@ function round(x, n) -- Credits toma91
     x = x * n
     if x >= 0 then x = math.floor(x + 0.5) else x = math.ceil(x - 0.5) end
     return x / n
+end
+
+function textSplit(inputstr, sep) -- Credits Adrian Mole and user973713
+    if sep == nil then
+            sep = "%s"
+    end
+    local t={}
+    for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+            table.insert(t, str)
+    end
+    return t
 end
 
 function safeLog(str, r, g, b, a)
@@ -59,7 +72,7 @@ function drawText(x, y, text, font, color, style)
         if (color == nil) then color = defaults[1]; end
         if (font == nil) then font = defaults[2]; end
 
-        if (style ~= "c" and style ~= "r" and style ~= "cr") then
+        if (style ~= "c" and style ~= "r" and style ~= "cr" and style ~= "cl") then
             renderer.text(x, y, text, color, font);
         else
             local textSize = renderer.get_text_size(text, font);
@@ -68,6 +81,8 @@ function drawText(x, y, text, font, color, style)
                 renderer.text(x - (textSize.x / 2), y - (textSize.y / 2), text, color, font);
             elseif (style == "r") then
                 renderer.text(x - textSize.x, y, text, color, font);
+            elseif (style == "cl") then
+                renderer.text(x, y - (textSize.y / 2), text, color, font);
             else
                 renderer.text(x - textSize.x, y - (textSize.y / 2), text, color, font);
             end
@@ -147,8 +162,20 @@ function mouseHandler()
     end
 end
 
-function loginHandler()
+function loginHandler(variables)
+    if (#variables == 3) then
+        local username = variables[1];
+        local password = variables[2];
+        local cheat = variables[3];
 
+        if (http.get("https://clownemoji.club/cheat/api.php?user=" .. username .. "&pass=" .. password .. "&cheat=" .. cheat .. "&auth=1") == "true") then
+            return true;
+        else
+            return false;
+        end
+    else
+        return false;
+    end
 end
 
 function textHandler()
@@ -188,9 +215,37 @@ function drawHandler(name, on)
     for i = 1, #forms do
         if (forms[i][1] == name) then
             if (on) then
-                renderer.set_clip(forms[i][4], forms[i][5], forms[i][3], forms[i][2])
+                renderer.set_clip(forms[i][4], forms[i][5], forms[i][2], forms[i][3])
             else
                 renderer.remove_clip();
+            end
+        end
+    end
+end
+
+function luaTableHandler(name)
+    if (not luaTable[2]) then
+        local values = http.get("https://clownemoji.club/cheat/api.php?user=" .. login[2] .. "&pass=" .. login[3] .. "&cheat=zapped&auth=2");
+        luaTable[3] = values;
+        luaTable[2] = true;
+        safeLog(values)
+    else
+        for i = 1, #forms do
+            if (forms[i][1] == name) then
+                local usedY = 0;
+                local value = textSplit(luaTable[3], "/");
+                if (value ~= nil) then
+                    if (#value > 0) then
+                        for f = 1, #value do
+                            if (value[f] ~= "") then
+                                renderer.filled_rect(forms[i][4] + 10, forms[i][5] + 52 + usedY, forms[i][2] - 20, 26, colors[2]);
+                                renderer.rect(forms[i][4] + 10, forms[i][5] + 52 + usedY, forms[i][2] - 20, 26, colors[4]);
+                                drawText(forms[i][4] + 16, forms[i][5] + 65 + usedY, value[f], nil, nil, "cl")
+                                usedY = usedY + 32
+                            end
+                        end
+                    end
+                end
             end
         end
     end
@@ -206,6 +261,8 @@ function drawForm(name)
             renderer.rect(forms[i][4], forms[i][5], forms[i][2], forms[i][3], colors[2]);
             renderer.filled_rect(forms[i][4], forms[i][5], forms[i][2], 2, colors[3]);
             drawText(forms[i][4] + (forms[i][2] / 2), forms[i][5] + 14, name, nil, nil, "c")
+
+            return {forms[i][4], forms[i][5], forms[i][2], forms[i][3]}
         end
     end
 end
@@ -227,15 +284,15 @@ function addTextbox(parentName, varname, x, y, w, h, centered)
                     formsIndex = i;
 
                     x, y = x + forms[i][4], y + forms[i][5];
-                end
 
-                if (centered) then
-                    x = (forms[i][4] + (forms[i][2] / 2)) - (w / 2)
+                    if (centered) then
+                        x = (forms[i][4] + (forms[i][2] / 2)) - (w / 2)
+                    end
                 end
             end
         end
 
-        renderer.set_clip(x, y, h + 1, w + 1);
+        renderer.set_clip(x, y, w + 1, h + 1);
         if (mouseVars[2] >= x and mouseVars[2] <= x + w and mouseVars[3] >= y and mouseVars[3] <= y + h) then
             if (selectedIndex ~= index) then
                 renderer.filled_rect(x, y, w, h, colors[2]);
@@ -258,10 +315,11 @@ function addTextbox(parentName, varname, x, y, w, h, centered)
 
         drawText(x + (w / 2), y + (h / 2), forms[formsIndex][6][index][2], nil, nil, "c")
         renderer.remove_clip();
+        return forms[formsIndex][6][index][2];
     end
 end
 
-function addButton(parentName, text, x, y, w, h, centered, func, varname)
+function addButton(parentName, text, x, y, w, h, centered, func, varname, variables)
     if (func ~= nil and x ~= nil and y ~= nil and w ~= nil and h ~= nil) then
         if (text == nil) then text = ""; end text = tostring(text);
         if (parentName ~= nil) then
@@ -274,10 +332,10 @@ function addButton(parentName, text, x, y, w, h, centered, func, varname)
                     end
 
                     x, y = x + forms[i][4], y + forms[i][5];
-                end
-
-                if (centered) then
-                    x = (forms[i][4] + (forms[i][2] / 2)) - (w / 2)
+                    
+                    if (centered) then
+                        x = (forms[i][4] + (forms[i][2] / 2)) - (w / 2)
+                    end
                 end
             end
         end
@@ -293,7 +351,11 @@ function addButton(parentName, text, x, y, w, h, centered, func, varname)
 
             if (keys.key_pressed(0x01)) then
                 selectedIndex = 0;
-                -- run function
+                local returnValue = func(variables);
+
+                if (returnValue ~= nil) then
+                    return returnValue;
+                end
             end
         else
             renderer.filled_rect(x, y, w, h, colors[1]);
@@ -310,11 +372,24 @@ function on_render()
     mouseHandler();
     textHandler();
 
-    -- Login Form
-    drawHandler("Login Form", true);
-    drawForm("Login Form");
-    drawHandler("Login Form", false);
-    addTextbox("Login Form", "var_login_username", 35, 75, 125, 35, true)
-    addTextbox("Login Form", "var_login_password", 35, 120, 125, 35, true)
-    addButton("Login Form", "Login", 35, 165, 125, 35, true, loginHandler)
+    if (not login[1]) then
+        -- Login Form
+        drawHandler("Login Form", true);
+        drawForm("Login Form");
+        drawHandler("Login Form", false);
+        local username = addTextbox("Login Form", "var_login_username", 35, 75, 125, 35, true)
+        local password = addTextbox("Login Form", "var_login_password", 35, 120, 125, 35, true)
+        local value = addButton("Login Form", "Login", 35, 165, 125, 35, true, loginHandler, nil, {username, password, "zapped"});
+        
+        if (value == true) then
+            login = { true, username, password };
+        end
+    else
+        if (game.focused) then
+            drawHandler("LUA Table", true);
+            local rectTable = drawForm("LUA Table");
+            luaTableHandler("LUA Table");
+            drawHandler("LUA Table", false);
+        end
+    end
 end
